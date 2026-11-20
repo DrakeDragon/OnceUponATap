@@ -1,11 +1,9 @@
-# Once Upon a Tap v45 — Wider realms
+# Once Upon a Tap v46 — Actions first
 
-All 13 boards are wider, approximately 2.8:1, with their existing heights and saved building positions retained. Existing illustrated scenery renders the added land without stretching character art. Launch and realm travel default to full overview. Tasks and recruitment no longer zoom the camera in. Use + or pinch to inspect; Fit restores the full realm.
+Landscape town controls are compact. Wide journals overlay the town instead of squeezing it into a narrow sidebar. Open a character to choose available tasks immediately. Completed-task Collect appears at the top. Ready residents and quest rewards are listed first. Story, animation and task settings are below available tasks; sealed activities stay mysterious.
 
-More > Text size offers Standard, Large and Extra large, saved with the town.
+More shows the daily gift, text-size controls and save export/import first. Expand Story, progress & more for archive recovery, animation studio, story replay and other secondary controls. Standard/Large/Extra large continue to save with the town.
 
-Before upgrading, use More > Backup save > Copy. Keep that external code and your v44 ZIP. Replace files at the SAME site address. The game also retains a pre-v45 backup, accessible in More > Before wider realms > Copy backup. New buildings in expanded land require v45 or later. To roll back, use the matching pre-upgrade code; later progress does not merge.
+100 characters, 13 wider realms and 2,700 tasks remain intact. No new art was needed. Export More > Backup save > Copy before replacing files and keep the previous ZIP. Deploy extracted contents with index.html at the GitHub Pages root. No backend or runtime image generation is required.
 
-Upload extracted contents to GitHub Pages with index.html at the root, or serve with python -m http.server 8080. No backend or runtime generation is required. See SAVE-GUIDE.md.
-
-131 grouped automated checks pass. Actual browser DOM/load checks at 844×390 passed without recorded errors. Browser screenshot capture failed; physical iPhone, smoothness and performance remain unverified.
+134 automated checks pass. Partial browser interaction/DOM checks were performed; screenshot capture failed and further local preview was blocked by automatic approval review over an unverified telemetry connection. Final visual, physical iPhone and performance acceptance are unverified. See SAVE-GUIDE.md and the development report.

@@ -590,11 +590,11 @@ function occupant(b) {
 }
 
 /* ---------- sheets ---------- */
-function openSheet(title, fn, live) { const changed = !R.sheetFn || $('#sheettitle').textContent !== title; if (changed) $('#sheetbody').scrollTop = 0; R.sheetFn = fn; R.sheetLive = !!live; $('#sheettitle').textContent = title; $('#sheet').classList.remove('hidden'); document.body?.classList.add('journal-open'); onResize(); renderSheet(); }
+function openSheet(title, fn, live) { const changed = !R.sheetFn || $('#sheettitle').textContent !== title; if (changed) $('#sheetbody').scrollTop = 0; R.sheetFn = fn; R.sheetLive = !!live; $('#sheettitle').textContent = title; $('#sheet').dataset.view = title.includes('Folk (') ? 'folk' : title.includes('Build') ? 'build' : 'journal'; $('#sheet').classList.remove('hidden'); $('#sheetshade').classList.remove('hidden'); document.querySelectorAll('#nav,#fabs,#zoom,#realmbtn,#journey').forEach(el=>el.inert=true); document.body?.classList.add('journal-open'); onResize(); renderSheet(); }
 function renderSheet() {
   if (!R.sheetFn) return;
   const b = $('#sheetbody'), sc = b.scrollTop;
-  const detailsOpen = ['.folk-story', '.mystery-summary'].map(sel => [sel, !!$('#sheetbody ' + sel)?.open]);
+  const detailsOpen = ['.folk-story', '.mystery-summary', '.character-details', '.locked-disclosure', '.settings-details'].map(sel => [sel, !!$('#sheetbody ' + sel)?.open]);
   const focused = document.activeElement;
   const focusAction = b.contains?.(focused) ? focused?.getAttribute?.('onclick') : null;
   b.innerHTML = R.sheetFn();
@@ -602,7 +602,7 @@ function renderSheet() {
   if (focusAction) { const replacement = Array.from(b.querySelectorAll?.('[onclick]') || []).find(el => el.getAttribute('onclick') === focusAction); replacement?.focus?.({preventScroll: true}); }
   b.scrollTop = sc;
 }
-function closeSheet() { R.sheetFn = null; R.sheetLive = false; $('#sheet').classList.add('hidden'); document.body?.classList.remove('journal-open'); onResize(); }
+function closeSheet() { R.sheetFn = null; R.sheetLive = false; $('#sheet').classList.add('hidden'); $('#sheetshade').classList.add('hidden'); document.querySelectorAll('#nav,#fabs,#zoom,#realmbtn,#journey').forEach(el=>el.inert=false); document.body?.classList.remove('journal-open'); onResize(); }
 let folkRealm = 0, buildRealm = 0;
 
 function showChar(ci) {
@@ -610,30 +610,32 @@ function showChar(ci) {
   openSheet(CHARS[ci].emoji + ' ' + CHARS[ci].name, () => {
     const ch = CHARS[ci], c = S.chars[ci], fl = friendLvl(c.fp), tl = TASKS[ci];
     const next = FRIEND_PTS[fl] != null ? FRIEND_PTS[fl] : null, prev = FRIEND_PTS[fl - 1];
-    let h = '<div class="small">' + REALMS[ch.realm].e + ' ' + REALMS[ch.realm].name + ' · Friendship ' + fl + (next ? ' <span>(' + (c.fp - prev) + '/' + (next - prev) + ')</span>' : ' (MAX)') + '</div>';
-    if (next) h += '<div class="prog"><i style="width:' + Math.round(100 * (c.fp - prev) / (next - prev)) + '%"></i></div>';
-    h += '<div class="character-banner">' + StoryArt.portrait(ci) + '<div><div class="eyebrow">STORYBOOK FOLK</div><h2>' + esc(ch.name) + '</h2><span class="small">' + Object.keys(c.discoveries || {}).length + '/27 memories restored</span></div></div>';
-    h += '<details class="folk-story"><summary>Read their story</summary><p class="story sm">'+esc(ch.back)+'</p>'+(ch.quote?'<p class="small">“'+esc(ch.quote)+'”</p>':'')+'</details>';
-    if(StoryArt.provisional(ci))h+='<p class="small">Provisional art: this character currently reuses a generated sprite. Their task motions and gameplay are active.</p>';
+    let about = '<div class="small">' + REALMS[ch.realm].e + ' ' + REALMS[ch.realm].name + ' · Friendship ' + fl + (next ? ' <span>(' + (c.fp - prev) + '/' + (next - prev) + ')</span>' : ' (MAX)') + '</div>';
+    if (next) about += '<div class="prog"><i style="width:' + Math.round(100 * (c.fp - prev) / (next - prev)) + '%"></i></div>';
+    about += '<div class="character-banner">' + StoryArt.portrait(ci) + '<div><div class="eyebrow">STORYBOOK FOLK</div><h2>' + esc(ch.name) + '</h2><span class="small">' + Object.keys(c.discoveries || {}).length + '/27 memories restored</span></div></div>';
+    about += '<details class="folk-story"><summary>Read their story</summary><p class="story sm">'+esc(ch.back)+'</p>'+(ch.quote?'<p class="small">“'+esc(ch.quote)+'”</p>':'')+'</details>';
+    if(StoryArt.provisional(ci))about+='<p class="small">Provisional art: this character currently reuses a generated sprite. Their task motions and gameplay are active.</p>';
+    let h = '';
     if (c.task) {
       const t = tl[c.task.i], left = (c.task.end - now()) / 1000;
-      if (left > 0) h += '<div class="activity-stage"><canvas id="activity-preview" width="780" height="300" data-ci="'+ci+'" aria-label="'+esc(ch.name)+' performing '+esc(t.name)+'"></canvas><span>'+(t.kind==='e'?'Inside '+REALMS[ch.realm].names[t.arg]:'A moment in '+REALMS[ch.realm].name)+'</span></div>';
-      if (left <= 0) h += '<div class="row"><div class="mid"><div class="nm">✅ ' + esc(t.name) + '</div><div class="sub">Done! Tap their bubble or collect here.</div></div><button class="btn cy" onclick="G.collect(' + ci + ')">Collect</button></div>';
+      if (left > 0) about += '<div class="activity-stage"><canvas id="activity-preview" width="780" height="300" data-ci="'+ci+'" aria-label="'+esc(ch.name)+' performing '+esc(t.name)+'"></canvas><span>'+(t.kind==='e'?'Inside '+REALMS[ch.realm].names[t.arg]:'A moment in '+REALMS[ch.realm].name)+'</span></div>';
+      if (left <= 0) h += '<div class="row claim-priority"><div class="mid"><div class="nm">✅ ' + esc(t.name) + '</div><div class="sub">Done! Tap their bubble or collect here.</div></div><button class="btn cy" onclick="G.collect(' + ci + ')">Collect</button></div>';
       else {
         const pct = 100 * taskProgress(c.task, now()), cost = Math.max(1, Math.ceil(left / 900));
-        h += '<div class="row" style="display:block"><div class="nm">' + TIERS[t.tier].icon + ' ' + esc(t.name) + '</div><div class="prog"><i style="width:' + pct.toFixed(1) + '%"></i></div><div style="display:flex;justify-content:space-between;align-items:center"><span class="sub">' + fmtTime(left) + ' left</span><button class="btn sm cy" onclick="G.rush(' + ci + ')">Rush · ' + cost + ' ✨</button></div></div>';
+        h += '<div class="current-task"><div><strong>'+esc(t.name)+'</strong><span class="small">'+fmtTime(left)+' left</span></div><button class="btn sm" onclick="G.rush('+ci+')">Rush · '+cost+' ✨</button><div class="prog"><i style="width:'+pct.toFixed(1)+'%"></i></div></div>';
       }
     }
-    h += '<label class="small" style="display:block;margin:6px 0"><input type="checkbox" ' + (c.rep ? 'checked' : '') + ' onchange="G.rep(' + ci + ',this.checked)"> ♻️ Auto-repeat last task</label>';
+    about += '<label class="small" style="display:block;margin:6px 0"><input type="checkbox" ' + (c.rep ? 'checked' : '') + ' onchange="G.rep(' + ci + ',this.checked)"> ♻️ Auto-repeat last task</label>';
     const revealed=tl.filter(t=>TaskAccess.revealed(S,ci,t.i)).length;
-    h+='<details class="mystery-summary"><summary>'+revealed+'/27 activities revealed</summary><span>Sealed tasks reveal their names and animations when their requirements are met.</span></details>';
+    about+='<details class="mystery-summary"><summary>'+revealed+'/27 activities revealed</summary><span>Sealed tasks reveal their names and animations when their requirements are met.</span></details>';
     const filter=R.taskFilters?.[ci]??-1;
-    h += '<p class="small">Quick 30s–5m · Medium 6m–2h · Long 2h 30m–24h</p>';
-    h += '<div class="chips task-filters" aria-label="Task duration filters">'+[[-1,'All 27'],[0,'Quick · 9'],[1,'Medium · 9'],[2,'Long · 9']].map(([v,label])=>'<button class="chip'+(filter===v?' on':'')+'" aria-pressed="'+(filter===v)+'" onclick="G.filterTasks('+ci+','+v+')">'+label+'</button>').join('')+'</div>';
+    about += '<p class="small">Quick 30s–5m · Medium 6m–2h · Long 2h 30m–24h</p>';
+    h += '<div class="chips task-filters" aria-label="Task duration filters">'+[[-1,'All'],[0,'Quick'],[1,'Medium'],[2,'Long']].map(([v,label])=>'<button class="chip'+(filter===v?' on':'')+'" aria-pressed="'+(filter===v)+'" onclick="G.filterTasks('+ci+','+v+')">'+label+'</button>').join('')+'</div>';
     const groups=TaskAccess.groups(S,ci,filter),recommended=!c.task&&S.stats.tasks<12&&!taskBlock(ci,9)?9:null;
     for(const [key,label] of [['available',c.task?'Unlocked tasks':'Available tasks'],['locked','Still to unlock']]){
       const tasks=groups[key];
       if(!tasks.length&&key==='locked')continue;
+      if (key === 'locked') h += '<details class="locked-disclosure"><summary>Sealed activities · '+tasks.length+'</summary>';
       h+='<section class="task-group '+key+'" data-task-group="'+key+'"><h3 class="task-group-title">'+label+' <span>'+tasks.length+'</span></h3>';
       if(key==='available'&&c.task)h+='<p class="task-group-hint">Choose your next activity after the current task finishes.</p>';
       if(!tasks.length)h+='<p class="task-group-hint">Meet a requirement below to reveal more activities.</p>';
@@ -653,20 +655,22 @@ function showChar(ci) {
         });
       });
       h+='</section>';
+      if (key === 'locked') h += '</details>';
     }
-    return h;
+    return h + '<details class="character-details"><summary>About, animation &amp; task settings</summary>' + about + '</details>';
   }, true);
 }
 function showFolk() {
   if (!S.realms[folkRealm]) folkRealm = S.cur;
   openSheet('👥 Folk (' + ownedCount() + '/' + CHARS.length + ')', () => {
     let h = '<div class="chips">' + REALMS.map((a, i) => S.realms[i] ? '<button class="chip' + (i === folkRealm ? ' on' : '') + '" onclick="G.folkRealm(' + i + ')">' + a.e + ' ' + a.name + ' ' + hiredIn(i) + '/' + realmChars(i).length + '</button>' : '').join('') + '</div>';
-    realmChars(folkRealm).forEach(ch => {
+    realmChars(folkRealm).slice().sort((a,b)=>{const rank=ch=>{const c=S.chars[ch.id];return !c?3:!c.task?1:c.task.end<=now()?0:2;};return rank(a)-rank(b)||a.id-b.id;}).forEach(ch => {
       const own = S.chars[ch.id], busy = own && own.task;
       let right;
-      if (own) right = '<button class="btn sm cy" onclick="G.showChar(' + ch.id + ')">Tasks</button>';
+      if (own && busy && own.task.end <= now()) right = '<button class="btn sm cy" onclick="G.collect('+ch.id+')">Collect</button>';
+      else if (own) right = '<button class="btn sm cy" onclick="G.showChar(' + ch.id + ')">Tasks</button>';
       else right = '<button class="btn sm' + (S.coins >= ch.cost ? '' : ' off') + '" onclick="G.buyChar(' + ch.id + ')">🪙 ' + fmt(ch.cost) + '</button>';
-      h += '<div class="row"><div class="em" style="' + (own ? '' : 'filter:grayscale(.8) brightness(.8)') + '">' + StoryArt.portrait(ch.id) + '</div><div class="mid"><div class="nm">' + esc(ch.name) + '</div><div class="sub">' + (own ? (busy ? 'Working: ' + esc(TASKS[ch.id][own.task.i].name) : 'Idle') + ' · Friend ' + friendLvl(own.fp) : esc(ch.back.split('.')[0] + '.')) + '</div></div>' + right + '</div>';
+      h += '<div class="row"><div class="em" style="' + (own ? '' : 'filter:grayscale(.8) brightness(.8)') + '">' + StoryArt.portrait(ch.id) + '</div><div class="mid"><div class="nm">' + esc(ch.name) + '</div><div class="sub">' + (own ? (busy ? 'Working: ' + esc(TASKS[ch.id][own.task.i].name) : 'Idle') + ' · Friend ' + friendLvl(own.fp) : (S.coins >= ch.cost ? 'Ready to recruit' : 'Not in town yet')) + '</div></div>' + right + '</div>';
     });
     return h;
   });
@@ -686,12 +690,17 @@ function showBuild() {
 }
 function showQuests() {
   openSheet('📜 Quests', () => {
-    let h = trailHTML() + commissionHTML() + '<div class="h3">Town achievements</div><div class="small" style="margin-bottom:8px">Charm: ' + S.blds.length + ' buildings · ' + stars() + '/5 ★ (+' + (stars() * 4) + '% coins)</div>';
-    const aq = activeQuests(); if (!aq.length) h += '<p>All quests complete — more tales soon!</p>';
+    const aq = activeQuests().slice().sort((a,b)=>(statVal(b.k)>=b.target)-(statVal(a.k)>=a.target));
+    const blocks=[];
+    const trail=trailHTML(), comm=commissionHTML();
+    blocks.push({ready:trail.includes('Claim reward'),html:trail},{ready:comm.includes('G.claimCommission()'),html:comm});
+    let h='';
     aq.forEach(q => {
       const v = Math.min(statVal(q.k), q.target), ok = v >= q.target;
-      h += '<div class="qrow' + (ok ? ' done' : '') + '"><div class="mid"><div class="nm">' + q.text + '</div><div class="prog"><i style="width:' + (100 * v / q.target) + '%"></i></div><div class="sub">' + fmt(v) + ' / ' + fmt(q.target) + ' · 🪙' + fmt(q.coin) + (q.wish ? ' · ' + q.wish + '✨' : '') + '</div></div>' + (ok ? '<button class="btn cy" onclick="G.claim(' + q.id + ')">Claim</button>' : '') + '</div>';
+      const card = '<div class="qrow' + (ok ? ' done' : '') + '"><div class="mid"><div class="nm">' + q.text + '</div><div class="prog"><i style="width:' + (100 * v / q.target) + '%"></i></div><div class="sub">' + fmt(v) + ' / ' + fmt(q.target) + ' · 🪙' + fmt(q.coin) + (q.wish ? ' · ' + q.wish + '✨' : '') + '</div></div>' + (ok ? '<button class="btn cy" onclick="G.claim(' + q.id + ')">Claim</button>' : '') + '</div>';
+      blocks.push({ready:ok,html:card});
     });
+    h = blocks.sort((a,b)=>Number(b.ready)-Number(a.ready)).map(x=>x.html).join('');
     return h;
   });
 }
@@ -746,17 +755,18 @@ function setTextSize(key) {
   onResize();
 }
 function showMenu() {
-  openSheet('⚙️ More', () => textSettingsHTML() +
+  openSheet('⚙️ More', () => '<div class="row"><div class="em">⛲</div><div class="mid"><div class="nm">Wishing Well</div><div class="sub">Daily gift · streak ' + S.streak + '</div></div>' + (wellReady() ? '<button class="btn cy" onclick="G.well()">Wish</button>' : '<span class="small">Tomorrow</span>') + '</div>' +
+    textSettingsHTML() +
+    '<div class="row"><div class="em">💾</div><div class="mid"><div class="nm">Backup save</div><div class="sub">Progress lives in this browser only.</div></div><button class="btn sm" onclick="G.exportSave()">Copy</button><button class="btn sm cy" onclick="G.importSave()">Load</button></div>' +
+    '<details class="settings-details"><summary>Story, progress &amp; more</summary>' +
     (localStorage.getItem(SAVE_KEY + '_preWide45') ? '<div class="row"><div class="mid"><div class="nm">Before wider realms</div><div class="sub">Recover the town saved before this upgrade.</div></div><button class="btn sm" onclick="G.wideBackup()">Copy backup</button></div>' : '') +
     '<div class="row"><div class="mid"><div class="nm">100-character campaign</div><div class="sub">Save migration, archived progress and original backup.</div></div><button class="btn sm cy" onclick="G.legacy()">Review</button></div>' +
     '<div class="row"><div class="mid"><div class="nm">Animation studio</div><div class="sub">Revisit the activities your town has unlocked. Future tasks stay sealed.</div></div><a class="btn sm cy" href="art-gallery.html">Visit</a></div>' +
     '<div class="row"><div class="mid"><div class="nm">Development journal</div><div class="sub">What is complete, what is in progress, and what comes next.</div></div><a class="btn sm cy" href="project-status.html">Read</a></div>' +
-    '<div class="row"><div class="em">⛲</div><div class="mid"><div class="nm">Wishing Well</div><div class="sub">Daily gift · streak ' + S.streak + '</div></div>' + (wellReady() ? '<button class="btn cy" onclick="G.well()">Wish</button>' : '<span class="small">Tomorrow</span>') + '</div>' +
     '<div class="row"><div class="em">📖</div><div class="mid"><div class="nm">Replay the story</div><div class="sub">Prologue and every realm intro you have seen</div></div><button class="btn sm cy" onclick="G.replay()">Read</button></div>' +
     '<div class="row"><div class="em">🔊</div><div class="mid"><div class="nm">Sound & vibration</div></div><button class="btn sm" onclick="G.toggleSound()">' + (S.sound ? 'On' : 'Off') + '</button></div>' +
-    '<div class="row"><div class="em">💾</div><div class="mid"><div class="nm">Backup save</div><div class="sub">Progress lives in this browser only.</div></div><button class="btn sm" onclick="G.exportSave()">Copy</button><button class="btn sm cy" onclick="G.importSave()">Load</button></div>' +
-    '<div class="row"><div class="em">🗺️</div><div class="mid"><div class="nm">Progress</div><div class="sub">' + S.realms.filter(Boolean).length + '/13 realms · ' + ownedCount() + '/100 folk · ' + doneCount() + '/13 pages</div></div></div>' +
-    '<div class="row"><div class="em">🧹</div><div class="mid"><div class="nm">Start over</div></div><button class="btn sm off" onclick="G.reset()">Reset</button></div>');
+    '<div class="row"><div class="em">🗺️</div><div class="mid"><div class="nm">Progress</div><div class="sub">' + S.realms.filter(Boolean).length + '/13 realms · ' + ownedCount() + '/100 folk · ' + doneCount() + '/13 pages · Charm ' + stars() + '/5 · Tale ' + S.tale + '/' + TALE_NEED + '</div></div></div>' +
+    '<div class="row"><div class="em">🧹</div><div class="mid"><div class="nm">Start over</div></div><button class="btn sm off" onclick="G.reset()">Reset</button></div></details>');
 }
 function showBldInfo(b) {
   const d = bdef(b.r, b.k), oc = occupant(b);
@@ -1007,7 +1017,8 @@ function hud() {
   $('#tf').style.width = (100 * S.tale / TALE_NEED) + '%'; $('#tt').textContent = '🎁 Tale meter ' + S.tale + '/' + TALE_NEED;
   const rb = $('#realmbtn'); if (rb) rb.textContent = REALMS[S.cur].e + ' ' + REALMS[S.cur].name + ' ▾';
   const ready = readyCount(), bc = $('#bdgCollect'); if (ready) { bc.textContent = ready; bc.classList.remove('hidden'); } else bc.classList.add('hidden');
-  const cq = claimable(), bq = $('#bdgQuest'); if (cq) { bq.textContent = cq; bq.classList.remove('hidden'); } else bq.classList.add('hidden');
+  const tq=TRAIL[S.trail], commissionReady=S.commissions[S.cur]&&commission(S.cur).progress>=commission(S.cur).target;
+  const cq = claimable()+(tq&&statVal(tq[2])>=tq[3]?1:0)+(commissionReady?1:0), bq = $('#bdgQuest'); if (cq) { bq.textContent = cq; bq.classList.remove('hidden'); } else bq.classList.add('hidden');
   const bm = $('#bdgMenu'); if (wellReady()) { bm.textContent = '!'; bm.classList.remove('hidden'); } else bm.classList.add('hidden');
   const h = $('#hint'); let msg = '';
   if (S.stats.tasks === 0) msg = '👆 Tap ' + CHARS[0].name + ', then pick a task. Quick ⚡ tasks take 30 seconds to five minutes!';
@@ -1063,7 +1074,7 @@ window.G = {
 function validSave(s) { return Campaign.valid(s); }
 function SaneIndex(v,n){return Number.isInteger(v)&&v>=0&&v<n;}
 function migrateEdition(){
- S.edition=45; S.campaign=19;
+ S.edition=46; S.campaign=19;
  S.textSize=TextSize.apply(S.textSize); S.trail=Number.isInteger(S.trail)?Math.max(0,Math.min(TRAIL.length,S.trail)):0;
  S.realmWork=S.realmWork||{}; S.commissions=S.commissions||{};
  Object.values(S.chars).forEach(c=>c.discoveries=c.discoveries||{});
