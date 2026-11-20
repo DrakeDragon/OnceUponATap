@@ -7,7 +7,7 @@ function readTown(){
 }
 function owned(id){return Number.isInteger(id)&&!!CHARS[id]&&!!town?.chars?.[id]&&!!town.realms[CHARS[id].realm];}
 function updateTown(wantedCi=ci,wantedTask=selected){
- town=readTown();const folk=CHARS.filter(c=>owned(c.id)),realmIds=[...new Set(folk.map(c=>c.realm))];
+ town=readTown();TextSize.apply(town?.textSize);const folk=CHARS.filter(c=>owned(c.id)),realmIds=[...new Set(folk.map(c=>c.realm))];
  ci=owned(wantedCi)?wantedCi:folk[0]?.id??-1;
  $('#realm').innerHTML=realmIds.length?realmIds.map(i=>'<option value="'+i+'">'+escapeHTML(REALMS[i].name)+'</option>').join(''):'<option value="-1">No realm to preview yet</option>';
  $('#realm').disabled=!realmIds.length;$('#realm').value=ci<0?-1:CHARS[ci].realm;populateFolk(ci,wantedTask);

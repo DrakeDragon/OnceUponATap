@@ -352,7 +352,10 @@ function setRealm(ri, silent) {
   R.sparks = [];
   ensureRuntime();
   const M = R.rt, c = R.cam; c.z = Math.max(0.4, Math.min(.95, R.W / (M.W * TILE) * 1.18));
-  focusCam(M.W * TILE / 2, M.H * TILE / 2, c.z);
+  const first = Object.values(R.rc)[0];
+  if (window.innerWidth > window.innerHeight && window.innerWidth >= 560 && first) {
+    focusCam(first.x, first.y, Math.max(.85, c.z));
+  } else focusCam(M.W * TILE / 2, M.H * TILE / 2, c.z);
   if (!silent) save();
   hud();
 }
@@ -573,9 +576,19 @@ function occupant(b) {
 }
 
 /* ---------- sheets ---------- */
-function openSheet(title, fn, live) { R.sheetFn = fn; R.sheetLive = !!live; $('#sheettitle').textContent = title; $('#sheet').classList.remove('hidden'); renderSheet(); }
-function renderSheet() { if (R.sheetFn) { const b = $('#sheetbody'), sc = b.scrollTop, wasOpen = $('#sheetbody .folk-story')?.open; b.innerHTML = R.sheetFn(); b.scrollTop = sc; const details=$('#sheetbody .folk-story');if(details && wasOpen)details.open=true; } }
-function closeSheet() { R.sheetFn = null; R.sheetLive = false; $('#sheet').classList.add('hidden'); }
+function openSheet(title, fn, live) { const changed = !R.sheetFn || $('#sheettitle').textContent !== title; if (changed) $('#sheetbody').scrollTop = 0; R.sheetFn = fn; R.sheetLive = !!live; $('#sheettitle').textContent = title; $('#sheet').classList.remove('hidden'); document.body?.classList.add('journal-open'); onResize(); renderSheet(); }
+function renderSheet() {
+  if (!R.sheetFn) return;
+  const b = $('#sheetbody'), sc = b.scrollTop;
+  const detailsOpen = ['.folk-story', '.mystery-summary'].map(sel => [sel, !!$('#sheetbody ' + sel)?.open]);
+  const focused = document.activeElement;
+  const focusAction = b.contains?.(focused) ? focused?.getAttribute?.('onclick') : null;
+  b.innerHTML = R.sheetFn();
+  for (const [sel, opened] of detailsOpen) { const details = $('#sheetbody ' + sel); if (details) details.open = opened; }
+  if (focusAction) { const replacement = Array.from(b.querySelectorAll?.('[onclick]') || []).find(el => el.getAttribute('onclick') === focusAction); replacement?.focus?.({preventScroll: true}); }
+  b.scrollTop = sc;
+}
+function closeSheet() { R.sheetFn = null; R.sheetLive = false; $('#sheet').classList.add('hidden'); document.body?.classList.remove('journal-open'); onResize(); }
 let folkRealm = 0, buildRealm = 0;
 
 function showChar(ci) {
@@ -599,10 +612,10 @@ function showChar(ci) {
     }
     h += '<label class="small" style="display:block;margin:6px 0"><input type="checkbox" ' + (c.rep ? 'checked' : '') + ' onchange="G.rep(' + ci + ',this.checked)"> ♻️ Auto-repeat last task</label>';
     const revealed=tl.filter(t=>TaskAccess.revealed(S,ci,t.i)).length;
-    h+='<div class="mystery-summary"><strong>'+revealed+'/27 activities revealed</strong><span>Sealed tasks reveal their names and animations when their requirements are met.</span></div>';
+    h+='<details class="mystery-summary"><summary>'+revealed+'/27 activities revealed</summary><span>Sealed tasks reveal their names and animations when their requirements are met.</span></details>';
     const filter=R.taskFilters?.[ci]??-1;
     h += '<p class="small">Quick 30s–5m · Medium 6m–2h · Long 2h 30m–24h</p>';
-    h += '<div class="chips task-filters" aria-label="Task duration filters">'+[[-1,'All 27'],[0,'Quick · 9'],[1,'Medium · 9'],[2,'Long · 9']].map(([v,label])=>'<button class="chip'+(filter===v?' on':'')+'" onclick="G.filterTasks('+ci+','+v+')">'+label+'</button>').join('')+'</div>';
+    h += '<div class="chips task-filters" aria-label="Task duration filters">'+[[-1,'All 27'],[0,'Quick · 9'],[1,'Medium · 9'],[2,'Long · 9']].map(([v,label])=>'<button class="chip'+(filter===v?' on':'')+'" aria-pressed="'+(filter===v)+'" onclick="G.filterTasks('+ci+','+v+')">'+label+'</button>').join('')+'</div>';
     const groups=TaskAccess.groups(S,ci,filter),recommended=!c.task&&S.stats.tasks<12&&!taskBlock(ci,9)?9:null;
     for(const [key,label] of [['available',c.task?'Unlocked tasks':'Available tasks'],['locked','Still to unlock']]){
       const tasks=groups[key];
@@ -707,8 +720,19 @@ function claimWell() {
   showModal('<div class="big">⛲</div><h2>Wishing Well</h2><p>Day ' + S.streak + ' streak!</p><p>+' + fmt(coin) + ' 🪙 &nbsp; +' + w + ' ✨</p><p class="small">Come back tomorrow. Every 7th day is extra generous.</p><p><button class="btn" onclick="G.closeModal()">Thank you!</button></p>');
   renderSheet(); save();
 }
+function textSettingsHTML() {
+  return '<fieldset class="text-settings"><legend>Text size</legend><p class="small">Choose the size that is comfortable to read.</p><div class="text-size-choices">' +
+    TextSize.choices.map(item => '<button class="chip" aria-pressed="' + (S.textSize === item.key) + '" onclick="G.setTextSize(\'' + item.key + '\')">' + item.label + '</button>').join('') +
+    '</div></fieldset>';
+}
+function setTextSize(key) {
+  S.textSize = TextSize.apply(key);
+  save();
+  renderSheet();
+  onResize();
+}
 function showMenu() {
-  openSheet('⚙️ More', () =>
+  openSheet('⚙️ More', () => textSettingsHTML() +
     '<div class="row"><div class="mid"><div class="nm">100-character campaign</div><div class="sub">Save migration, archived progress and original backup.</div></div><button class="btn sm cy" onclick="G.legacy()">Review</button></div>' +
     '<div class="row"><div class="mid"><div class="nm">Animation studio</div><div class="sub">Revisit the activities your town has unlocked. Future tasks stay sealed.</div></div><a class="btn sm cy" href="art-gallery.html">Visit</a></div>' +
     '<div class="row"><div class="mid"><div class="nm">Development journal</div><div class="sub">What is complete, what is in progress, and what comes next.</div></div><a class="btn sm cy" href="project-status.html">Read</a></div>' +
@@ -729,7 +753,7 @@ function showBldInfo(b) {
 function worldW() { return R.rt ? R.rt.W * TILE : 1; }
 function worldH() { return R.rt ? R.rt.H * TILE : 1; }
 function clampCam() {
-  const c = R.cam, minZ = Math.max(0.2, Math.min(R.W / worldW(), R.H / worldH()) * 0.9);
+  const c = R.cam, minZ = Math.max(0.03, Math.min(R.W / worldW(), R.H / worldH()) * 0.9);
   c.z = Math.max(minZ, Math.min(2.4, c.z));
   const vw = R.W / c.z, vh = R.H / c.z, mg = 40;
   c.x = vw >= worldW() + mg * 2 ? (worldW() - vw) / 2 : Math.max(-mg, Math.min(worldW() - vw + mg, c.x));
@@ -740,32 +764,76 @@ function focusCam(x, y, z) { R.cam.z = z || R.cam.z; R.cam.x = x - R.W / 2 / R.c
 /* ---------- input ---------- */
 const cv = $('#c'), ctx = cv.getContext('2d');
 const ptrs = new Map(); let pinchD = 0;
-function onResize() { R.dpr = Math.min(window.devicePixelRatio || 1, 2.5); R.W = window.innerWidth; R.H = window.innerHeight; cv.width = R.W * R.dpr; cv.height = R.H * R.dpr; clampCam(); }
+function canvasPoint(clientX, clientY) {
+  const rect = cv.getBoundingClientRect?.();
+  return { x: clientX - (rect?.left || 0), y: clientY - (rect?.top || 0) };
+}
+function onResize() {
+  const centerX = R.cam.x + R.W / (2 * R.cam.z);
+  const centerY = R.cam.y + R.H / (2 * R.cam.z);
+  const hadViewport = R.W > 0 && R.H > 0;
+  const rect = cv.getBoundingClientRect?.();
+  const width = rect?.width > 0 ? rect.width : window.innerWidth;
+  const height = rect?.height > 0 ? rect.height : window.innerHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const left = rect?.left || 0, top = rect?.top || 0;
+  if (R.W === width && R.H === height && R.dpr === dpr && R.mapLeft === left && R.mapTop === top) return;
+  R.dpr = dpr;
+  R.W = width;
+  R.H = height;
+  R.mapLeft = left;
+  R.mapTop = top;
+  cv.width = Math.round(R.W * R.dpr);
+  cv.height = Math.round(R.H * R.dpr);
+  ptrs.clear();
+  pinchD = 0;
+  if (R.rt) {
+    if (hadViewport) focusCam(centerX, centerY, R.cam.z);
+    else clampCam();
+  }
+}
+function zoomAt(factor, x = R.W / 2, y = R.H / 2) {
+  const worldX = R.cam.x + x / R.cam.z;
+  const worldY = R.cam.y + y / R.cam.z;
+  R.cam.z *= factor;
+  clampCam();
+  R.cam.x = worldX - x / R.cam.z;
+  R.cam.y = worldY - y / R.cam.z;
+  clampCam();
+}
+function fitTown() {
+  if (!R.rt) return;
+  const zoom = Math.min(R.W / worldW(), R.H / worldH()) * .96;
+  focusCam(worldW() / 2, worldH() / 2, zoom);
+}
 cv.addEventListener('pointerdown', (e) => {
   if (ptrs.size >= 2 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const point = canvasPoint(e.clientX, e.clientY);
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false });
+  ptrs.set(e.pointerId, { x: point.x, y: point.y, sx: point.x, sy: point.y, moved: false });
   if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); ptrs.forEach(p => p.moved = true); }
 });
 cv.addEventListener('pointermove', (e) => {
   const p = ptrs.get(e.pointerId); if (!p) return;
+  const point = canvasPoint(e.clientX, e.clientY);
   if (ptrs.size === 2) {
-    p.x = e.clientX; p.y = e.clientY;
+    p.x = point.x; p.y = point.y;
     const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
     if (pinchD > 0 && d > 0) { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, wx = mx / R.cam.z + R.cam.x, wy = my / R.cam.z + R.cam.y; R.cam.z *= d / pinchD; clampCam(); R.cam.x = wx - mx / R.cam.z; R.cam.y = wy - my / R.cam.z; clampCam(); }
     pinchD = d; return;
   }
-  const dx = e.clientX - p.x, dy = e.clientY - p.y;
-  if (!p.moved && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) p.moved = true;
+  const dx = point.x - p.x, dy = point.y - p.y;
+  if (!p.moved && Math.hypot(point.x - p.sx, point.y - p.sy) > 8) p.moved = true;
   if (p.moved) { R.cam.x -= dx / R.cam.z; R.cam.y -= dy / R.cam.z; clampCam(); }
-  p.x = e.clientX; p.y = e.clientY;
+  p.x = point.x; p.y = point.y;
 });
 function pEnd(e) {
   const pointer = ptrs.get(e.pointerId);
   if (!pointer) return;
   ptrs.delete(e.pointerId);
   if (ptrs.size < 2) pinchD = 0;
-  const releaseDistance = Math.hypot(e.clientX - pointer.sx, e.clientY - pointer.sy);
+  const point = canvasPoint(e.clientX, e.clientY);
+  const releaseDistance = Math.hypot(point.x - pointer.sx, point.y - pointer.sy);
   if (e.type === 'pointerup' && !pointer.moved && !ptrs.size && releaseDistance <= 8) {
     tap(e.clientX, e.clientY);
   }
@@ -777,7 +845,11 @@ window.addEventListener('blur', () => {
   ptrs.clear();
   pinchD = 0;
 });
-cv.addEventListener('wheel', (e) => { e.preventDefault(); const wx = e.clientX / R.cam.z + R.cam.x, wy = e.clientY / R.cam.z + R.cam.y; R.cam.z *= e.deltaY < 0 ? 1.1 : 0.9; clampCam(); R.cam.x = wx - e.clientX / R.cam.z; R.cam.y = wy - e.clientY / R.cam.z; clampCam(); }, { passive: false });
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const point = canvasPoint(e.clientX, e.clientY);
+  zoomAt(e.deltaY < 0 ? 1.1 : .9, point.x, point.y);
+}, { passive: false });
 // Character-body targets follow the rendered lateral offset. Wide task props
 // are intentionally excluded, so a nearby table does not steal a neighbor tap.
 function characterHit(ci,rc,wx,wy,zoom,ready){
@@ -789,7 +861,8 @@ function characterHit(ci,rc,wx,wy,zoom,ready){
  return Math.hypot(dx,(dy+26)*.7);
 }
 function tap(sx, sy) {
-  const rt = R.rt, wx = sx / R.cam.z + R.cam.x, wy = sy / R.cam.z + R.cam.y;
+  const point = canvasPoint(sx, sy);
+  const rt = R.rt, wx = point.x / R.cam.z + R.cam.x, wy = point.y / R.cam.z + R.cam.y;
   if (R.place) { const d = bdef(rt.ri, R.place.k); R.place.tx = Math.round(wx / TILE - d.w / 2); R.place.ty = Math.round(wy / TILE - d.h / 2); placeUi(); return; }
   for (let i = R.sparks.length - 1; i >= 0; i--) { const s = R.sparks[i]; if (Math.hypot(s.x - wx, s.y - wy) < 34 / Math.min(1, R.cam.z) + 10) { catchSpark(s); R.sparks.splice(i, 1); return; } }
   let best = null, bd = 1e9;
@@ -823,7 +896,7 @@ function update(dt) {
   updateChars(dt);
   if (t > R.nextSpark && R.rt) {
     R.nextSpark = t + (S.stats.tasks < 24 ? rnd(10000, 18000) : rnd(25000, 70000));
-    if (R.sparks.length < 3) { const visible = R.rt.free.filter(i => { const x = tcx(i % R.rt.W), y = tcy((i / R.rt.W)|0); return x > R.cam.x + 50/R.cam.z && x < R.cam.x + (R.W-80)/R.cam.z && y > R.cam.y + 210/R.cam.z && y < R.cam.y + (R.H-180)/R.cam.z; }); const i = pick(visible.length ? visible : R.rt.free); R.sparks.push({ x: tcx(i % R.rt.W), y: tcy((i / R.rt.W) | 0), born: t }); }
+    if (R.sparks.length < 3) { const visible = R.rt.free.filter(i => { const x = tcx(i % R.rt.W), y = tcy((i / R.rt.W)|0); const margin = Math.min(48, R.W / 5, R.H / 5); return x > R.cam.x + margin/R.cam.z && x < R.cam.x + (R.W-margin)/R.cam.z && y > R.cam.y + margin/R.cam.z && y < R.cam.y + (R.H-margin)/R.cam.z; }); const i = pick(visible.length ? visible : R.rt.free); R.sparks.push({ x: tcx(i % R.rt.W), y: tcy((i / R.rt.W) | 0), born: t }); }
   }
   R.sparks = R.sparks.filter(s => t - s.born < 20000);
   if (t > R.nextQuip) { R.nextQuip = t + rnd(60000, 120000); toast('🪶 ' + pick(QUIPS)); }
@@ -840,7 +913,7 @@ function bubble(x, y, e) {
   ctx.beginPath(); ctx.moveTo(x - 5, y + 12); ctx.lineTo(x, y + 20); ctx.lineTo(x + 5, y + 12); ctx.fillStyle = '#fff'; ctx.fill();
   ctx.font = '20px serif'; ctx.fillStyle = '#000'; ctx.fillText(e, x, y - 1);
 }
-function label(txt, x, y, size) { ctx.font = 'bold ' + (size || 10) + 'px system-ui'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000b'; ctx.lineWidth = 3; ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y); }
+function label(txt, x, y, size) { ctx.font = 'bold ' + ((size || 10) * TextSize.choice(S.textSize).scale) + 'px system-ui'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000b'; ctx.lineWidth = 3; ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y); }
 const LS = 2; // static layer scale
 function buildLayer(rt) { return StoryArt.world(rt, LS); }
 function render() {
@@ -919,7 +992,7 @@ function hud() {
   const cq = claimable(), bq = $('#bdgQuest'); if (cq) { bq.textContent = cq; bq.classList.remove('hidden'); } else bq.classList.add('hidden');
   const bm = $('#bdgMenu'); if (wellReady()) { bm.textContent = '!'; bm.classList.remove('hidden'); } else bm.classList.add('hidden');
   const h = $('#hint'); let msg = '';
-  if (S.stats.tasks === 0) msg = '👆 Tap ' + CHARS[0].name + ', then pick a task. Quick ⚡ tasks take under two minutes!';
+  if (S.stats.tasks === 0) msg = '👆 Tap ' + CHARS[0].name + ', then pick a task. Quick ⚡ tasks take 30 seconds to five minutes!';
   else if (S.stats.tasks < 4) msg = '🪙 Tap the bubble over a character to collect. Chain collects for COMBOS!';
   else if (ownedCount() < 2) msg = S.coins >= CHARS[1].cost ? '👥 You can afford a friend! Open Folk to meet ' + CHARS[1].name + '.' : '🪙 Earn ' + fmt(CHARS[1].cost) + ' coins to bring ' + CHARS[1].name + ' home. Longer tasks pay more!';
   else if (S.blds.length === 0 && S.coins >= bdef(0, 0).cost) msg = '🔨 Build the ' + REALMS[0].names[0] + ' — folk walk inside to work and a timer shows on its roof.';
@@ -947,7 +1020,7 @@ function replayStory() {
 }
 window.G = {
   closeModal, closeSheet, showChar, claimTrail, claimCommission,
-  filterTasks: (ci,tier) => { R.taskFilters=R.taskFilters||{};R.taskFilters[ci]=tier;$('#sheetbody').scrollTop=0;renderSheet(); },
+  filterTasks: (ci,tier) => { R.taskFilters=R.taskFilters||{};R.taskFilters[ci]=tier;renderSheet();$('#sheetbody .task-filters')?.scrollIntoView?.({block:'start'}); },
   start: (ci, i) => { if (startTask(ci, i)) { closeSheet(); const rc=R.rc[ci]; if(rc)focusCam(rc.x,rc.y-R.H*.08/R.cam.z,Math.max(.9,R.cam.z)); } },
   collect: (ci) => { collectChar(ci); renderSheet(); save(); },
   rush: (ci) => { const c = S.chars[ci]; if (!c || !c.task) return; const left = (c.task.end - now()) / 1000, cost = Math.max(1, Math.ceil(left / 900)); if (S.wishes < cost) { toast('Need ' + cost + ' ✨'); return; } S.wishes -= cost; c.task.end = now(); toast('⚡ Rushed!'); renderSheet(); save(); },
@@ -962,15 +1035,17 @@ window.G = {
   exportSave: () => { const s = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(() => toast('💾 Save copied to clipboard'), () => window.prompt('Copy your save code:', s)); },
   importSave: () => { const s = window.prompt('Paste your save code:'); if (!s) return; try { const raw=decodeURIComponent(escape(atob(s.trim()))), o=Campaign.migrate(JSON.parse(raw)); if (!validSave(o)) throw 0; const current=localStorage.getItem(SAVE_KEY); if(current)localStorage.setItem(SAVE_KEY+'_beforeImport',current); if(o.legacyArchive)localStorage.setItem(SAVE_KEY+'_pre100',o.legacyArchive.original); localStorage.setItem(SAVE_KEY, JSON.stringify(o)); location.reload(); } catch (e) { toast('That save code did not work'); } },
   reset: () => { if (window.confirm('Erase everything and start over?')) { localStorage.removeItem(SAVE_KEY); location.reload(); } },
+  setTextSize,
   _state: () => S, _R: R,
-  _t: { characterHit, taskBlock, stepAlong, collectChar, startTask, placeValid, confirmPlace, collectAll, update, render, hud, save, showFolk, showBuild, showQuests, showBook, showRealms, showMenu, showChar, QUESTS, sendAll, setRealm, unlockRealm, buyChar, buildRT, genMap, bfs, astar, checkRealm, getPlace: () => R.place, setPlace: (p) => { R.place = p; }, gainCoins, gainXp, MAPS, bldAt },
+  _t: { onResize, fitTown, zoomAt, canvasPoint, characterHit, taskBlock, stepAlong, collectChar, startTask, placeValid, confirmPlace, collectAll, update, render, hud, save, showFolk, showBuild, showQuests, showBook, showRealms, showMenu, showChar, QUESTS, sendAll, setRealm, unlockRealm, buyChar, buildRT, genMap, bfs, astar, checkRealm, getPlace: () => R.place, setPlace: (p) => { R.place = p; }, gainCoins, gainXp, MAPS, bldAt },
 };
 
 /* These functions are included inside the engine closure by the release script. */
 function validSave(s) { return Campaign.valid(s); }
 function SaneIndex(v,n){return Number.isInteger(v)&&v>=0&&v<n;}
 function migrateEdition(){
- S.edition=42; S.campaign=19; S.trail=Number.isInteger(S.trail)?Math.max(0,Math.min(TRAIL.length,S.trail)):0;
+ S.edition=44; S.campaign=19;
+ S.textSize=TextSize.apply(S.textSize); S.trail=Number.isInteger(S.trail)?Math.max(0,Math.min(TRAIL.length,S.trail)):0;
  S.realmWork=S.realmWork||{}; S.commissions=S.commissions||{};
  Object.values(S.chars).forEach(c=>c.discoveries=c.discoveries||{});
 }
@@ -1022,11 +1097,13 @@ function boot() {
   $('#begin').onclick = () => { $('#title-screen').classList.add('hidden'); if (fresh) { toast('Welcome, Reader. Your story trail starts with Little Red.', true); showChar(0); } };
   StoryArt.title($('#title-art'));
   $('#journey').onclick = showQuests;
-  $('#zoomin').onclick = () => { R.cam.z = Math.min(2, R.cam.z * 1.2); clampCam(); };
-  $('#zoomout').onclick = () => { R.cam.z = Math.max(0.45, R.cam.z / 1.2); clampCam(); };
-  $('#homecam').onclick = () => focusCam(worldW()/2, worldH()/2, R.cam.z);
+  $('#zoomin').onclick = () => zoomAt(1.2);
+  $('#zoomout').onclick = () => zoomAt(1 / 1.2);
+  $('#homecam').onclick = fitTown;
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (modalOpen) closeModal(); else if (R.place) cancelPlace(); else closeSheet(); } });
-  window.addEventListener('resize', onResize); onResize();
+  window.addEventListener('resize', onResize);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(onResize).observe(cv);
+  onResize();
   setRealm(Math.min(S.cur || 0, REALMS.length - 1), true);
   $('#sheetclose').onclick = closeSheet;
   $('#btnCollect').onclick = collectAll; $('#btnSend').onclick = sendAll;
@@ -1048,3 +1125,4 @@ function boot() {
 }
 boot();
 })();
+
