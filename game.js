@@ -48,6 +48,7 @@ function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY); if (!raw) return null;
     const parsed = JSON.parse(raw), s = Campaign.migrate(parsed);
+    if ((parsed.edition || 0) < 45 && !localStorage.getItem(SAVE_KEY + '_preWide45')) localStorage.setItem(SAVE_KEY + '_preWide45', raw);
     if (s !== parsed) {
       // Both writes must succeed before booting the reduced town. Never fall back
       // to a new town when backup/migration storage fails.
@@ -151,8 +152,8 @@ function bfs(blk, W, H, sx, sy) {
   }
   return { reach, n };
 }
-function genMap(ri) {
-  const Rm = REALMS[ri], W = Rm.W, H = Rm.H, kind = new Uint8Array(W * H), deco = new Uint8Array(W * H), rn = seeded(ri * 77 + 5);
+function genOriginalMap(ri) {
+  const Rm = REALMS[ri], W = Rm.originalW || Rm.W, H = Rm.H, kind = new Uint8Array(W * H), deco = new Uint8Array(W * H), rn = seeded(ri * 77 + 5);
   const set = (x, y, k) => { if (x >= 0 && y >= 0 && x < W && y < H) kind[y * W + x] = k; };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) kind[y * W + x] = 1;
   // landmarks in the four corner slots; door = free tile below the middle
@@ -176,6 +177,23 @@ function genMap(ri) {
   const blk0 = kind.map(k => (k ? 1 : 0)), r = bfs(blk0, W, H, 2, 2);
   for (let i = 0; i < W * H; i++) if (!kind[i] && !r.reach[i]) kind[i] = 3;
   return { ri, W, H, kind, deco, lms, rn };
+}
+// Extend east without moving a saved building, landmark, obstacle or task destination.
+function genMap(ri) {
+  const old = genOriginalMap(ri), W = REALMS[ri].W, H = old.H;
+  if (W === old.W) return old;
+  const kind = new Uint8Array(W * H), deco = new Uint8Array(W * H);
+  for (let y=0;y<H;y++) for (let x=0;x<W;x++) {
+    const i=y*W+x;
+    if (x<old.W) { kind[i]=old.kind[y*old.W+x]; deco[i]=old.deco[y*old.W+x]; }
+    else if (y<2 || y>=H-2 || x>=W-2) kind[i]=1;
+    // The old east boundary becomes a continuous, walkable town expansion.
+    if (x>=old.W-2 && x<W-2 && y>=2 && y<H-2) {
+      kind[i]=0;
+      if (Math.abs(y-H/2)<1 || x===old.W+3) deco[i]=1;
+    }
+  }
+  return {...old,W,kind,deco};
 }
 function rint2(rn, a, b) { return a + Math.floor(rn() * (b - a + 1)); }
 
@@ -351,11 +369,7 @@ function setRealm(ri, silent) {
   S.cur = ri; R.rt = buildRT(ri); R.rc = {}; R.layer = null; R.place = null; placeUi();
   R.sparks = [];
   ensureRuntime();
-  const M = R.rt, c = R.cam; c.z = Math.max(0.4, Math.min(.95, R.W / (M.W * TILE) * 1.18));
-  const first = Object.values(R.rc)[0];
-  if (window.innerWidth > window.innerHeight && window.innerWidth >= 560 && first) {
-    focusCam(first.x, first.y, Math.max(.85, c.z));
-  } else focusCam(M.W * TILE / 2, M.H * TILE / 2, c.z);
+  fitTown();
   if (!silent) save();
   hud();
 }
@@ -521,7 +535,7 @@ function buyChar(ci) {
   S.coins -= ch.cost; S.chars[ci] = mkChar();
   sfxLevel(); buzz(20); closeSheet();
   if (ch.realm !== S.cur) setRealm(ch.realm, true); else ensureRuntime();
-  const rc = R.rc[ci]; if (rc) { burst(rc.x, rc.y, 14, '💖'); focusCam(rc.x, rc.y, Math.max(R.cam.z, 1)); }
+  const rc = R.rc[ci]; if (rc) { burst(rc.x, rc.y, 14, '💖');  }
   story(ch.emoji, ch.name + ' joins you!', ch.back, REALMS[ch.realm].name + ' · befriend them to unlock more tasks', 'Hello!');
   checkRealm(ch.realm); save();
 }
@@ -733,6 +747,7 @@ function setTextSize(key) {
 }
 function showMenu() {
   openSheet('⚙️ More', () => textSettingsHTML() +
+    (localStorage.getItem(SAVE_KEY + '_preWide45') ? '<div class="row"><div class="mid"><div class="nm">Before wider realms</div><div class="sub">Recover the town saved before this upgrade.</div></div><button class="btn sm" onclick="G.wideBackup()">Copy backup</button></div>' : '') +
     '<div class="row"><div class="mid"><div class="nm">100-character campaign</div><div class="sub">Save migration, archived progress and original backup.</div></div><button class="btn sm cy" onclick="G.legacy()">Review</button></div>' +
     '<div class="row"><div class="mid"><div class="nm">Animation studio</div><div class="sub">Revisit the activities your town has unlocked. Future tasks stay sealed.</div></div><a class="btn sm cy" href="art-gallery.html">Visit</a></div>' +
     '<div class="row"><div class="mid"><div class="nm">Development journal</div><div class="sub">What is complete, what is in progress, and what comes next.</div></div><a class="btn sm cy" href="project-status.html">Read</a></div>' +
@@ -753,7 +768,7 @@ function showBldInfo(b) {
 function worldW() { return R.rt ? R.rt.W * TILE : 1; }
 function worldH() { return R.rt ? R.rt.H * TILE : 1; }
 function clampCam() {
-  const c = R.cam, minZ = Math.max(0.03, Math.min(R.W / worldW(), R.H / worldH()) * 0.9);
+  const c = R.cam, minZ = Math.max(0.03, Math.min(R.W / worldW(), R.H / worldH()));
   c.z = Math.max(minZ, Math.min(2.4, c.z));
   const vw = R.W / c.z, vh = R.H / c.z, mg = 40;
   c.x = vw >= worldW() + mg * 2 ? (worldW() - vw) / 2 : Math.max(-mg, Math.min(worldW() - vw + mg, c.x));
@@ -788,11 +803,13 @@ function onResize() {
   ptrs.clear();
   pinchD = 0;
   if (R.rt) {
-    if (hadViewport) focusCam(centerX, centerY, R.cam.z);
+    if (R.overview) fitTown();
+    else if (hadViewport) focusCam(centerX, centerY, R.cam.z);
     else clampCam();
   }
 }
 function zoomAt(factor, x = R.W / 2, y = R.H / 2) {
+  R.overview = false;
   const worldX = R.cam.x + x / R.cam.z;
   const worldY = R.cam.y + y / R.cam.z;
   R.cam.z *= factor;
@@ -803,7 +820,8 @@ function zoomAt(factor, x = R.W / 2, y = R.H / 2) {
 }
 function fitTown() {
   if (!R.rt) return;
-  const zoom = Math.min(R.W / worldW(), R.H / worldH()) * .96;
+  R.overview = true;
+  const zoom = Math.min(R.W / worldW(), R.H / worldH());
   focusCam(worldW() / 2, worldH() / 2, zoom);
 }
 cv.addEventListener('pointerdown', (e) => {
@@ -819,12 +837,12 @@ cv.addEventListener('pointermove', (e) => {
   if (ptrs.size === 2) {
     p.x = point.x; p.y = point.y;
     const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinchD > 0 && d > 0) { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, wx = mx / R.cam.z + R.cam.x, wy = my / R.cam.z + R.cam.y; R.cam.z *= d / pinchD; clampCam(); R.cam.x = wx - mx / R.cam.z; R.cam.y = wy - my / R.cam.z; clampCam(); }
+    if (pinchD > 0 && d > 0) { R.overview = false; const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, wx = mx / R.cam.z + R.cam.x, wy = my / R.cam.z + R.cam.y; R.cam.z *= d / pinchD; clampCam(); R.cam.x = wx - mx / R.cam.z; R.cam.y = wy - my / R.cam.z; clampCam(); }
     pinchD = d; return;
   }
   const dx = point.x - p.x, dy = point.y - p.y;
   if (!p.moved && Math.hypot(point.x - p.sx, point.y - p.sy) > 8) p.moved = true;
-  if (p.moved) { R.cam.x -= dx / R.cam.z; R.cam.y -= dy / R.cam.z; clampCam(); }
+  if (p.moved) { R.overview = false; R.cam.x -= dx / R.cam.z; R.cam.y -= dy / R.cam.z; clampCam(); }
   p.x = point.x; p.y = point.y;
 });
 function pEnd(e) {
@@ -1021,7 +1039,7 @@ function replayStory() {
 window.G = {
   closeModal, closeSheet, showChar, claimTrail, claimCommission,
   filterTasks: (ci,tier) => { R.taskFilters=R.taskFilters||{};R.taskFilters[ci]=tier;renderSheet();$('#sheetbody .task-filters')?.scrollIntoView?.({block:'start'}); },
-  start: (ci, i) => { if (startTask(ci, i)) { closeSheet(); const rc=R.rc[ci]; if(rc)focusCam(rc.x,rc.y-R.H*.08/R.cam.z,Math.max(.9,R.cam.z)); } },
+  start: (ci, i) => { if (startTask(ci, i)) { closeSheet(); } },
   collect: (ci) => { collectChar(ci); renderSheet(); save(); },
   rush: (ci) => { const c = S.chars[ci]; if (!c || !c.task) return; const left = (c.task.end - now()) / 1000, cost = Math.max(1, Math.ceil(left / 900)); if (S.wishes < cost) { toast('Need ' + cost + ' ✨'); return; } S.wishes -= cost; c.task.end = now(); toast('⚡ Rushed!'); renderSheet(); save(); },
   rep: (ci, v) => { S.chars[ci].rep = !!v; save(); },
@@ -1035,16 +1053,17 @@ window.G = {
   exportSave: () => { const s = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(() => toast('💾 Save copied to clipboard'), () => window.prompt('Copy your save code:', s)); },
   importSave: () => { const s = window.prompt('Paste your save code:'); if (!s) return; try { const raw=decodeURIComponent(escape(atob(s.trim()))), o=Campaign.migrate(JSON.parse(raw)); if (!validSave(o)) throw 0; const current=localStorage.getItem(SAVE_KEY); if(current)localStorage.setItem(SAVE_KEY+'_beforeImport',current); if(o.legacyArchive)localStorage.setItem(SAVE_KEY+'_pre100',o.legacyArchive.original); localStorage.setItem(SAVE_KEY, JSON.stringify(o)); location.reload(); } catch (e) { toast('That save code did not work'); } },
   reset: () => { if (window.confirm('Erase everything and start over?')) { localStorage.removeItem(SAVE_KEY); location.reload(); } },
+  wideBackup: () => { const raw=localStorage.getItem(SAVE_KEY+'_preWide45'); if(raw)window.prompt('Copy this pre-v45 save code for rollback with your previous release:',btoa(unescape(encodeURIComponent(raw)))); },
   setTextSize,
   _state: () => S, _R: R,
-  _t: { onResize, fitTown, zoomAt, canvasPoint, characterHit, taskBlock, stepAlong, collectChar, startTask, placeValid, confirmPlace, collectAll, update, render, hud, save, showFolk, showBuild, showQuests, showBook, showRealms, showMenu, showChar, QUESTS, sendAll, setRealm, unlockRealm, buyChar, buildRT, genMap, bfs, astar, checkRealm, getPlace: () => R.place, setPlace: (p) => { R.place = p; }, gainCoins, gainXp, MAPS, bldAt },
+  _t: { genOriginalMap, onResize, fitTown, zoomAt, canvasPoint, characterHit, taskBlock, stepAlong, collectChar, startTask, placeValid, confirmPlace, collectAll, update, render, hud, save, showFolk, showBuild, showQuests, showBook, showRealms, showMenu, showChar, QUESTS, sendAll, setRealm, unlockRealm, buyChar, buildRT, genMap, bfs, astar, checkRealm, getPlace: () => R.place, setPlace: (p) => { R.place = p; }, gainCoins, gainXp, MAPS, bldAt },
 };
 
 /* These functions are included inside the engine closure by the release script. */
 function validSave(s) { return Campaign.valid(s); }
 function SaneIndex(v,n){return Number.isInteger(v)&&v>=0&&v<n;}
 function migrateEdition(){
- S.edition=44; S.campaign=19;
+ S.edition=45; S.campaign=19;
  S.textSize=TextSize.apply(S.textSize); S.trail=Number.isInteger(S.trail)?Math.max(0,Math.min(TRAIL.length,S.trail)):0;
  S.realmWork=S.realmWork||{}; S.commissions=S.commissions||{};
  Object.values(S.chars).forEach(c=>c.discoveries=c.discoveries||{});

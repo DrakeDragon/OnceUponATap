@@ -59,3 +59,6 @@ const TRAIL = [
  ['An evening to remember','Complete one Long task.', 'long',1,500,40,'folk'],
  ['Beyond the binding','Uncover Gingerbread Grove when its requirements are met.', 'realms',2,600,50,'realms']
 ];
+
+// Wider playable land; retain the complete original coordinate system for saves.
+REALMS.slice(0,13).forEach(r => { r.originalW = r.W; r.W = Math.max(r.W, Math.ceil(r.H * 2.8)); });

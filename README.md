@@ -1,15 +1,11 @@
-# Once Upon a Tap v44 — Landscape and readable text
+# Once Upon a Tap v45 — Wider realms
 
-100 residents, 13 realms and 2,700 tasks. Quick 30s–5m, Medium 6m–2h, Long 2h 30m–24h.
+All 13 boards are wider, approximately 2.8:1, with their existing heights and saved building positions retained. Existing illustrated scenery renders the added land without stretching character art. Launch and realm travel default to full overview. Tasks and recruitment no longer zoom the camera in. Use + or pinch to inspect; Fit restores the full realm.
 
-Turn your phone sideways for the landscape layout: left navigation, compact status bar, side journals and bottom town controls. Fit shows the whole town; + and − return to closer views. Portrait remains available. Browser orientation follows the device; this release does not force an OS orientation lock.
+More > Text size offers Standard, Large and Extra large, saved with the town.
 
-Open More > Text size and choose Standard (100%), Large (120%) or Extra large (140%). The preference saves with your town and is used by the animation studio. Larger text increases scrolling in journals.
+Before upgrading, use More > Backup save > Copy. Keep that external code and your v44 ZIP. Replace files at the SAME site address. The game also retains a pre-v45 backup, accessible in More > Before wider realms > Copy backup. New buildings in expanded land require v45 or later. To roll back, use the matching pre-upgrade code; later progress does not merge.
 
-Before upgrading, use More > Backup save > Copy and keep that code and your v43 ZIP. Replace files at the same site address to keep the browser save. See SAVE-GUIDE.md.
+Upload extracted contents to GitHub Pages with index.html at the root, or serve with python -m http.server 8080. No backend or runtime generation is required. See SAVE-GUIDE.md.
 
-Deploy the extracted contents with index.html at the GitHub Pages root. No backend or runtime generation is needed. Alternatively serve locally with python -m http.server 8080.
-
-128 grouped mocked checks pass. Actual desktop Chromium browser checks covered 844×390 landscape, 390×844 portrait and 1280×800 laptop viewports. These are not physical iPhone/Safari, touch, performance or full visual acceptance tests.
-
-V44 polish: wrapping duration filters, filter-result navigation, journal scroll reset, focus/disclosure preservation, stronger text contrast and compact landscape headers. See the development delivery for the open acceptance gates.
+131 grouped automated checks pass. Actual browser DOM/load checks at 844×390 passed without recorded errors. Browser screenshot capture failed; physical iPhone, smoothness and performance remain unverified.
