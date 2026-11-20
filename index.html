@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#163e35">
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Once Upon a Tap · The Gilded Storybook</title>
+<meta name="description" content="Restore thirteen enchanted realms in a storybook town-building adventure. 100 characters, 2700 tasks, no downloads or account required.">
+<link rel="stylesheet" href="style.css?v=42">
+</head>
+<body>
+<canvas id="c" aria-label="Your enchanted town. Drag to explore; pinch or use the zoom buttons to zoom."></canvas>
+<div id="chaptermark">THE GILDED STORYBOOK <span>EDITION XLII</span></div>
+<button id="journey" aria-label="Open your story trail"></button>
+<div id="zoom"><button id="zoomout" aria-label="Zoom out">−</button><button id="homecam" aria-label="Center town">⌂</button><button id="zoomin" aria-label="Zoom in">+</button></div>
+<div id="title-screen"><canvas id="title-art"></canvas><div class="title-copy"><div class="eyebrow">A WORLD WAITING TO BE REWRITTEN</div><h1>Once Upon<br><em>a Tap</em></h1><div class="title-rule">✦</div><p>Gather your folk. Mend the pages.<br>Bring a little wonder back to the world.</p><button id="begin" class="btn">Open the storybook <span>→</span></button><small>13 ENCHANTED REALMS · 100 STORYBOOK FOLK</small></div><div class="title-footer">THE GILDED STORYBOOK &nbsp; / &nbsp; EDITION XLII</div></div>
+
+<div id="hud">
+  <div id="lvl">1</div>
+  <div class="hudcol">
+    <div class="bar"><i id="xpf"></i><span id="xpt"></span></div>
+    <div class="pills">
+      <div class="pill" id="coins">🪙 0</div>
+      <div class="pill wish" id="wish">✨ 0</div>
+      <div class="pill ench" id="ench">💖 ☆☆☆☆☆</div>
+    </div>
+  </div>
+</div>
+
+<button id="realmbtn">🌲 Hollow Wood ▾</button>
+<div id="combo" class="hidden"></div>
+
+<div id="tale"><div class="tbar"><i id="tf"></i></div><span id="tt">Tale meter</span></div>
+
+<div id="fabs">
+  <button id="btnCollect"><b>🪙</b><small>Collect</small><em id="bdgCollect" class="badge hidden"></em></button>
+  <button id="btnSend"><b>🔁</b><small>Send all</small></button>
+</div>
+
+<div id="hint"></div>
+<div id="toasts"></div>
+
+<nav id="nav">
+  <button data-nav="build"><b>🔨</b><small>Build</small></button>
+  <button data-nav="folk"><b>👥</b><small>Folk</small></button>
+  <button data-nav="quests"><b>📜</b><small>Quests</small><em id="bdgQuest" class="badge hidden"></em></button>
+  <button data-nav="book"><b>📖</b><small>Book</small></button>
+  <button data-nav="menu"><b>⚙️</b><small>More</small><em id="bdgMenu" class="badge hidden"></em></button>
+</nav>
+
+<div id="placebar" class="hidden">
+  <div id="placetxt"></div>
+  <button id="placeNo" aria-label="Cancel placement">✕</button>
+  <button id="placeYes" aria-label="Confirm placement">✓</button>
+</div>
+
+<div id="sheet" class="hidden" role="dialog" aria-label="Town journal">
+  <div id="sheethead"><span id="sheettitle"></span><button id="sheetclose" aria-label="Close town journal">✕</button></div>
+  <div id="sheetbody"></div>
+</div>
+
+<div id="modal" class="hidden" role="dialog" aria-modal="true" aria-label="Story"><div id="modalbox"></div></div>
+
+<script src="data_realms.js?v=42"></script>
+<script src="chars_1.js?v=42"></script>
+<script src="chars_2.js?v=42"></script>
+<script src="chars_3.js?v=42"></script>
+<script src="uniq_patch.js?v=42"></script>
+<script src="data_build.js?v=42"></script>
+<script src="edition-data.js?v=42"></script><script src="task-access.js?v=42"></script>
+<script src="never-art.js?v=42"></script>
+<script src="motion-data.js?v=42"></script><script src="art.js?v=42"></script>
+<script src="campaign.js?v=42"></script><script src="game.js?v=42"></script>
+</body>
+</html>
